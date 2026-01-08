@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Shooter By Edo</title>
+<style>
+  body { margin:0; overflow:hidden; background:black; touch-action:none; }
+  canvas { display:none; }
+
+  /* SPLASH */
+  #splash{
+    position:fixed; inset:0;
+    background:linear-gradient(#000,#111);
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    color:white; font-family:Arial;
+    z-index:20;
+  }
+  #splash h1{font-size:36px;margin:0}
+  #splash p{opacity:.7;margin:10px 0 25px}
+  #splash button{
+    padding:12px 26px;font-size:16px;
+    border:none;border-radius:8px;cursor:pointer;
+  }
+
+  #cmdBox{
+    position:fixed;top:18px;left:240px;
+    background:rgba(0,0,0,.6);padding:4px;border-radius:6px;
+  }
+  #cmdBox input{
+    width:90px;background:black;color:lime;
+    border:none;outline:none;font-size:12px;padding:4px;
+  }
+
+  #gameOverUI{
+    position:fixed; inset:0;
+    display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.8);
+    flex-direction:column; color:white;
+    font-family:Arial; z-index:10;
+  }
+  #gameOverUI button{
+    margin-top:15px; padding:10px 18px;
+    font-size:16px; border:none; border-radius:8px;
+    background:#ff4d6d; color:white; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <h1>🚀 SHOOTER GAME</h1>
+  <p>Created By Edo</p>
+  <button onclick="startGame()">START</button>
+</div>
+
+<canvas id="game"></canvas>
+<div id="cmdBox"><input id="cmdInput" placeholder="cmd"></div>
+
+<div id="gameOverUI">
+  <h1>GAME OVER</h1>
+  <p id="finalScore"></p>
+  <p>Created By</p>
+  <button onclick="openIG()">Instagram @Calon_senshu</button>
+</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+canvas.width=innerWidth;
+canvas.height=innerHeight;
+
+let started=false,gameOver=false;
+let score=0,weaponLevel=1;
+let cheatActive=false,cheatScoreInterval=null;
+
+let player={x:canvas.width/2,y:canvas.height-80,hp:100,maxHp:100};
+let bullets=[],enemies=[],stars=[];
+
+let enemySpeed=4,spawnRate=800;
+let healEnemy=null;
+const HEAL_CD=120000;
+let lastHeal=Date.now(),healTimer=HEAL_CD;
+
+let boss=null,bossSpawnScore=1000;
+
+/* BG */
+for(let i=0;i<80;i++)
+stars.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,s:1+Math.random()*2});
+
+/* SPLASH */
+function startGame(){
+  splash.style.display="none";
+  canvas.style.display="block";
+  started=true;
+  update();
+}
+
+/* CMD */
+cmdInput.onkeydown=e=>{
+  if(e.key==="Enter"){
+    const cmd=e.target.value.trim().toUpperCase();
+
+    if(cmd==="ABOUTYOU" && !cheatActive){
+      cheatActive=true;
+      enemies.length=0;
+      boss=null;
+
+      cheatScoreInterval=setInterval(()=>{
+        if(!gameOver) score+=100;
+      },1000);
+    }
+
+    if(cmd==="KILL"){
+      player.hp=0;
+    }
+    e.target.value="";
+  }
+};
+
+/* MOVE */
+canvas.onmousemove=e=>player.x=e.clientX;
+canvas.ontouchmove=e=>player.x=e.touches[0].clientX;
+
+/* AUTO SHOOT */
+setInterval(()=>{
+  if(gameOver||!started) return;
+  let spread=[0];
+  if(weaponLevel>=2) spread=[-10,10];
+  if(weaponLevel>=3) spread=[0,-18,18];
+  spread.forEach(s=>bullets.push({x:player.x+s,y:player.y}));
+},300);
+
+/* SPAWN ENEMY */
+setInterval(()=>{
+  if(gameOver||boss||!started||cheatActive) return;
+  enemies.push({x:Math.random()*canvas.width,y:-40});
+},spawnRate);
+
+/* HEAL */
+function spawnHeal(){
+  healEnemy={x:Math.random()*canvas.width,y:-40};
+  lastHeal=Date.now(); healTimer=HEAL_CD;
+}
+
+/* BOSS */
+function spawnBoss(){
+  boss={x:canvas.width/2,y:-80,hp:300};
+}
+
+/* IG */
+function openIG(){
+  window.open("https://instagram.com/Calon_senshu","_blank");
+}
+
+/* UPDATE */
+function update(){
+  if(!started) return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle="white";
+  stars.forEach(s=>{s.y+=s.s;if(s.y>canvas.height)s.y=0;ctx.fillRect(s.x,s.y,2,2);});
+
+  enemySpeed=4+Math.floor(score/500);
+
+  if(!cheatActive && !boss && score>=bossSpawnScore){
+    spawnBoss(); bossSpawnScore+=1500;
+  }
+
+  ctx.fillStyle="cyan";
+  ctx.fillRect(player.x-15,player.y-15,30,30);
+
+  ctx.fillStyle="red";ctx.fillRect(20,20,200,18);
+  ctx.fillStyle="lime";ctx.fillRect(20,20,(player.hp/player.maxHp)*200,18);
+  ctx.strokeStyle="white";ctx.strokeRect(20,20,200,18);
+  ctx.fillStyle="white";ctx.font="12px Arial";
+  ctx.textAlign="center";ctx.fillText(player.hp+" / "+player.maxHp,120,33);
+  ctx.textAlign="left";ctx.fillText("Score: "+score,20,65);
+
+  if(!healEnemy){
+    healTimer=Math.max(0,HEAL_CD-(Date.now()-lastHeal));
+    ctx.fillText("Heal CD: "+Math.ceil(healTimer/1000)+"s",20,90);
+    if(healTimer===0) spawnHeal();
+  }
+
+  if(score>=300) weaponLevel=2;
+  if(score>=700) weaponLevel=3;
+
+  ctx.fillStyle="yellow";
+  bullets.forEach((b,i)=>{
+    b.y-=12;ctx.fillRect(b.x-3,b.y-10,6,15);
+    if(b.y<0) bullets.splice(i,1);
+  });
+
+  ctx.fillStyle="red";
+  enemies.forEach((e,ei)=>{
+    e.y+=enemySpeed;
+    ctx.fillRect(e.x-15,e.y-15,30,30);
+
+    if(e.y>player.y+20){player.hp-=5;enemies.splice(ei,1);}
+
+    bullets.forEach((b,bi)=>{
+      if(b.x>e.x-15&&b.x<e.x+15&&b.y>e.y-15&&b.y<e.y+15){
+        score+=10; enemies.splice(ei,1); bullets.splice(bi,1);
+      }
+    });
+  });
+
+  if(healEnemy){
+    healEnemy.y+=3;
+    ctx.fillStyle="lime";
+    ctx.fillRect(healEnemy.x-14,healEnemy.y-14,28,28);
+    bullets.forEach((b,bi)=>{
+      if(b.x>healEnemy.x-14&&b.x<healEnemy.x+14&&b.y>healEnemy.y-14&&b.y<healEnemy.y+14){
+        player.hp=Math.min(player.maxHp,player.hp+30);
+        bullets.splice(bi,1); healEnemy=null;
+      }
+    });
+  }
+
+  if(boss){
+    boss.y+=1.5;
+    ctx.fillStyle="yellow";
+    ctx.fillRect(boss.x-50,boss.y-30,100,60);
+    bullets.forEach((b,bi)=>{
+      if(b.x>boss.x-50&&b.x<boss.x+50&&b.y>boss.y-30&&b.y<boss.y+30){
+        boss.hp-=10; bullets.splice(bi,1);
+      }
+    });
+    if(boss.hp<=0){
+      score+=550;
+      player.hp=Math.min(player.maxHp,player.hp+50);
+      boss=null;
+    }
+  }
+
+  if(player.hp<=0){
+    gameOver=true;
+    finalScore.innerText="Score: "+score;
+    gameOverUI.style.display="flex";
+    return;
+  }
+
+  requestAnimationFrame(update);
+}
+</script>
+</body>
+</html>
